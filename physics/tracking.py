@@ -4,44 +4,51 @@ from .twiss import TwissParameters
 from .elements import MatchingTriplet
 
 class ParticleTracker:
+    """Трекер частиц через секцию ускорителя"""
+    
     def __init__(self, triplet: MatchingTriplet, twiss_x: TwissParameters, 
-                 twiss_y: TwissParameters, n_particles: int = 500):
+                 twiss_y: TwissParameters, n_particles: int = 1000):
         self.triplet = triplet
         self.twiss_x = twiss_x
         self.twiss_y = twiss_y
         self.n_particles = n_particles
         self.particles = self._generate_particles()
+        
+        print(f"🔬 ParticleTracker: {n_particles} частиц")
+        print(f"   σ_x: {np.sqrt(twiss_x.beta * twiss_x.emittance) * 1000:.3f} мм")
+        print(f"   σ_y: {np.sqrt(twiss_y.beta * twiss_y.emittance) * 1000:.3f} мм")
     
     def _generate_particles(self) -> np.ndarray:
-        sigma_x = np.sqrt(self.twiss_x.beta * self.twiss_x.emittance)
-        sigma_xp = np.sqrt(self.twiss_x.gamma * self.twiss_x.emittance)
-        sigma_y = np.sqrt(self.twiss_y.beta * self.twiss_y.emittance)
-        sigma_yp = np.sqrt(self.twiss_y.gamma * self.twiss_y.emittance)
+        """Генерация начального распределения частиц с корреляцией"""
+        # Ковариационная матрица для X
+        cov_xx = self.twiss_x.beta * self.twiss_x.emittance
+        cov_xxp = -self.twiss_x.alpha * self.twiss_x.emittance
+        cov_xpxp = self.twiss_x.gamma * self.twiss_x.emittance
+        cov_matrix_x = np.array([[cov_xx, cov_xxp], [cov_xxp, cov_xpxp]])
         
-        particles = np.zeros((self.n_particles, 4))
-        particles[:, 0] = np.random.normal(0, sigma_x, self.n_particles)
-        particles[:, 1] = np.random.normal(0, sigma_xp, self.n_particles)
-        particles[:, 2] = np.random.normal(0, sigma_y, self.n_particles)
-        particles[:, 3] = np.random.normal(0, sigma_yp, self.n_particles)
+        # Генерация коррелированных частиц по X
+        particles_x = np.random.multivariate_normal(
+            [0, 0], cov_matrix_x, self.n_particles
+        )
         
-        return particles
+        # Ковариационная матрица для Y
+        cov_yy = self.twiss_y.beta * self.twiss_y.emittance
+        cov_yyp = -self.twiss_y.alpha * self.twiss_y.emittance
+        cov_ypyp = self.twiss_y.gamma * self.twiss_y.emittance
+        cov_matrix_y = np.array([[cov_yy, cov_yyp], [cov_yyp, cov_ypyp]])
+        
+        # Генерация коррелированных частиц по Y
+        particles_y = np.random.multivariate_normal(
+            [0, 0], cov_matrix_y, self.n_particles
+        )
+        
+        return np.column_stack([particles_x, particles_y])
     
-    def track_through(self) -> np.ndarray:
-        M_x = self.triplet.get_transfer_matrix_x()
-        M_y = self.triplet.get_transfer_matrix_y()
-        
-        x_out = M_x[0,0] * self.particles[:,0] + M_x[0,1] * self.particles[:,1]
-        xp_out = M_x[1,0] * self.particles[:,0] + M_x[1,1] * self.particles[:,1]
-        y_out = M_y[0,0] * self.particles[:,2] + M_y[0,1] * self.particles[:,3]
-        yp_out = M_y[1,0] * self.particles[:,2] + M_y[1,1] * self.particles[:,3]
-        
-        return np.column_stack([x_out, xp_out, y_out, yp_out])
-    
-    def get_phase_space(self, at_start: bool = True) -> Dict:
-        particles = self.particles if at_start else self.track_through()
+    def get_phase_space(self) -> Dict:
+        """Получение фазового пространства"""
         return {
-            'x': [float(x * 1000) for x in particles[:, 0]],
-            'xp': [float(xp * 1000) for xp in particles[:, 1]],
-            'y': [float(y * 1000) for y in particles[:, 2]],
-            'yp': [float(yp * 1000) for yp in particles[:, 3]],
+            'x': (self.particles[:, 0] * 1000).tolist(),  # мм
+            'xp': (self.particles[:, 1] * 1000).tolist(),  # мрад
+            'y': (self.particles[:, 2] * 1000).tolist(),  # мм
+            'yp': (self.particles[:, 3] * 1000).tolist()   # мрад
         }

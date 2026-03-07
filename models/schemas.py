@@ -23,7 +23,7 @@ class MatchingRequest(BaseModel):
     target: TwissTarget = Field(default_factory=TwissTarget)
     energy: float = Field(10.0, ge=0.1, le=1000)
     particle_type: str = Field("proton")
-    max_quad_gradient: float = Field(20.0, ge=1, le=100)
+    max_gradient: float = Field(20.0, ge=1, le=100)
 
 class MatchingResult(BaseModel):
     """Результат согласования"""
