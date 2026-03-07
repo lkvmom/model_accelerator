@@ -5,11 +5,17 @@
 ## 🚀 Быстрый старт
 
 ```bash
+# Создание виртуального окружения
+py -3.11 -m venv venv
+
+# Включение виртуального оружения
+venv\Scripts\activate
+
 # Установка зависимостей
 pip install -r requirements.txt
 
 # Запуск сервера
-python main.py
+uvicorn main:app --reload
 
 # Открыть в браузере
-http://localhost:8000
+http://127.0.0.1:8000
